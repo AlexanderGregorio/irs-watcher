@@ -3,21 +3,19 @@ package org.irs;
 import groovy.util.logging.Slf4j;
 import io.restassured.RestAssured;
 import io.restassured.filter.log.ResponseLoggingFilter;
+import javafx.embed.swing.JFXPanel;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.util.Duration;
 import lombok.SneakyThrows;
-import sun.audio.AudioPlayer;
-import sun.audio.AudioStream;
 
-import javax.swing.*;
 import java.awt.*;
-import java.io.*;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 @Slf4j
-public class Main extends JFrame {
+public class Main {
 
     private static final Logger log = Logger.getLogger(Main.class.getName());
 
@@ -33,9 +31,11 @@ public class Main extends JFrame {
             .withMinute(0)
             .withSecond(0);
 
-    private final AudioStream audioStream;
+    private final MediaPlayer mediaPlayer;
 
     public static void main(String[] args) {
+        //Needed to start context for MediaPlayer
+        JFXPanel fxPanel = new JFXPanel();
         new Main().start();
     }
 
@@ -43,19 +43,25 @@ public class Main extends JFrame {
     public Main() throws HeadlessException {
         super();
 
-        InputStream stream = getClass()
+        String filePath = getClass()
                 .getClassLoader()
-                .getResourceAsStream("alarm.mp3");
-        Objects.requireNonNull(stream);
-        audioStream = new AudioStream(stream);
+                .getResource("alarm.mp3")
+                .toURI()
+                .toString();
+        Media media = new Media(filePath);
+        mediaPlayer = new MediaPlayer(media);
+        mediaPlayer.setOnEndOfMedia(() -> {
+            mediaPlayer.seek(Duration.ZERO);
+            mediaPlayer.play();
+        });
     }
 
     @SneakyThrows
     public void start() {
         LocalDateTime end = LocalDateTime.now().plusHours(10);
 
-        while(LocalDateTime.now().isBefore(end)) {
-            if(!areThereAppointments()) {
+        while (LocalDateTime.now().isBefore(end)) {
+            if (areThereAppointments()) {
                 try {
                     log.info("Waiting");
                     Thread.sleep(getWait());
@@ -80,20 +86,20 @@ public class Main extends JFrame {
     }
 
     public void playAlarm() {
-        AudioPlayer.player.start(audioStream);
+        mediaPlayer.play();
         try {
             Thread.sleep(TimeUnit.SECONDS.toMillis(60));
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        AudioPlayer.player.stop(audioStream);
+        mediaPlayer.stop();
     }
 
     public long getWait() {
         LocalDateTime now = LocalDateTime.now();
 
-        if(now.isAfter(RELEASE_TIME.minusMinutes(2)) && now.isBefore(RELEASE_TIME.plusMinutes(2)))
+        if (now.isAfter(RELEASE_TIME.minusMinutes(2)) && now.isBefore(RELEASE_TIME.plusMinutes(2)))
             return SHORT_WAIT;
         return LONG_WAIT;
     }
- }
+}
